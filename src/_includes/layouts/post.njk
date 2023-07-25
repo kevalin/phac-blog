@@ -1,0 +1,13 @@
+---
+layout: layouts/base.njk
+---
+
+<div class="pt-6 divide-y divide-gray-100">
+  <div>
+    <div class="text-2xl">{{ title }}</div>
+    <div class="text-xs text-gray-400">{{ date | formaterDate }}</div>
+  </div>
+  <div>
+    {{ content | safe }}
+  </div>
+</div>

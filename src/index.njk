@@ -1,0 +1,49 @@
+---
+layout: layouts/base.njk
+title: 首页
+eleventyNavigation:
+  key: 首页
+  order: 1
+---
+
+<div class="divide-y divide-gray-100">
+	{% for post in collections.posts %}
+    {% if post.data.thumbnail %}
+      <div class="max-h-40 mb-5 transition duration-500 ease-in-out transform hover:bg-gray-100" >
+        <div class="grid grid-rows-1 grid-flow-col gap-0">
+          <div class="col-span-2 pl-5">
+            <div class="text-xl pt-5" ><a class="hover:text-gray-500" href="{{ post.url }}">{{ post.data.title }}</a></div>
+            <div class="text-xs text-gray-400">
+              {{ post.data.date | formaterDate }}
+            </div>
+            <div class="mb-5 mt-2">
+              <p>
+                dsadsadasdasdsdsada
+                <a class="text-blue-500 text-sm hover:text-blue-400" href="{{ post.url }}">阅读全文</a>
+              </p>
+            </div>
+          </div>
+          <div class="col-span-2 justify-self-end">
+            <img class="max-h-20 mt-5 mr-5 mb-5 rounded-md border-white" src="{{post.data.thumbnail}}">
+          </div>
+        </div>
+      </div>
+    {% else %}
+      <div class="divide-y max-h-40 transition duration-500 ease-in-out transform hover:bg-gray-100" >
+        <div class="grid grid-rows-1 grid-flow-col gap-0">
+          <div class="col-span-2 pl-5">
+            <div class="text-xl pt-5" ><a class="hover:text-gray-500" href="{{ post.url }}">{{ post.data.title }}</a></div>
+            <div class="text-xs text-gray-400">{{ post.data.date | formaterDate }}</div>
+            <div class="mb-5 mt-2">
+              <p>
+                dsadsadasdasdsdsada
+                <a class="text-blue-500 text-sm hover:text-blue-400" href="{{ post.url }}">阅读全文</a>
+              </p>
+            </div>
+          </div>
+        </div>
+      </div>
+    {% endif %}
+	{% endfor %}
+</div>
+
