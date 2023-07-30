@@ -1,0 +1,229 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta http-equiv="X-UA-Compatible" content="IE=edge">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/lxgw-wenkai-webfont/1.7.0/lxgwwenkai-regular.min.css" integrity="sha512-Fzvxn9FrR1aKr/Z4Pg9KpnVHCsJoq2QwSu1juU2oQ6wDUkUMk3qQUUWKgFjk0m0LzCamIJVOkg5zeyNX5I1wgA==" crossorigin="anonymous" referrerpolicy="no-referrer" />
+  <link rel="stylesheet" href="/assets/css/tailwind.css">
+  <title>举个栗子 - Centos7 搭建L2TP+IPsec VPN</title>
+</head>
+<body>
+    <header class="text-center">
+      <div class="mt-20">
+        <a class="text-gray-600 hover:text-gray-500 text-2xl font-bold" href="/">举个栗子</a>
+      </div>
+      <div class="mt-4">
+        <span class="text-gray-500 font-serif">好读书，不求甚解</span>
+      </div>
+
+      <nav class="mt-8 block">
+        
+          <a
+            class="text-blue-500 hover:text-blue-400 pr-2 pl-2" 
+            href="/"
+            
+          >首页</a>
+        
+          <a
+            class="text-blue-500 hover:text-blue-400 pr-2 pl-2" 
+            href="/posts/about/"
+            
+          >关于</a>
+        
+      </nav>
+    </header>
+    <div class="container mx-auto">
+      <div class="max-w-3xl mx-auto py-10">
+        <main>
+          
+
+<div>
+<div class="flex bg-white ring-1 ring-gray-100 ring-offset-0 shadow-md rounded-md mb-5">
+  <div class="p-8">
+    <div class="text-xl font-bold">Centos7 搭建L2TP+IPsec VPN</div>
+    <div class="text-xs text-gray-400 mt-2 mb-8">2023年02月23日</div>
+    <div class="break-all text-sm">
+      <h1 id="centos7-%E6%90%AD%E5%BB%BAl2tp%2Bipsec-vpn" tabindex="-1">Centos7 搭建L2TP+IPsec VPN</h1>
+<p>L2TP是一种工业标准的Internet隧道协议，功能大致和PPTP协议类似，比如同样可以对网络数据流进行加密。&lt;!-- more --&gt;不过也有不同之处，比如PPTP要求网络为IP网络，L2TP要求面向数据包的点对点连接；PPTP使用单一隧道，L2TP使用多隧道；L2TP提供包头压缩、隧道验证，而PPTP不支持。L2TP本身不提供加密功能, 经常搭配IPsec加密协议一起使用, 可以提供比PPTP更高级别的数据加密。</p>
+<h2 id="%E5%89%8D%E6%9C%9F%E5%87%86%E5%A4%87" tabindex="-1">前期准备</h2>
+<p>检查L2TP需要的环境支持</p>
+<pre class="language-bash"><code class="language-bash"><span class="token comment"># 查看主机是否支持pptp，返回结果为yes就表示通过</span><br>modprobe ppp-compress-18 <span class="token operator">&amp;&amp;</span> <span class="token builtin class-name">echo</span> <span class="token function">yes</span><br><span class="token comment"># 查看是否开启了TUN</span><br><span class="token comment"># 有的虚拟机主机需要开启，返回结果为cat: /dev/net/tun: File descriptor in bad state或cat: /dev/net/tun: 文件描述符处于错误状态。就表示通过。</span><br><span class="token function">cat</span> /dev/net/tun</code></pre>
+<h2 id="%E5%AE%89%E8%A3%85" tabindex="-1">安装</h2>
+<p>需要安装的软件</p>
+<ul>
+<li>ppp: 提供用户名密码验证功能，实现 VPN 的用户账号密码验证 (Centos7.x已经自带)</li>
+<li>libreswan: 提供 IPsec 功能，加密 IP 数据包</li>
+<li>xl2tpd: 提供 VPN 功能，依赖于 ppp 和 libreswan</li>
+</ul>
+<p>开始安装</p>
+<pre class="language-bash"><code class="language-bash"><span class="token comment"># 先更新</span><br>yum <span class="token function">install</span> update<br>yum update -y<br><br><span class="token comment"># 安装EPEL源，因为CentOS7官方源中已经去掉了xl2tpd</span><br>yum <span class="token function">install</span> -y epel-release<br><br><span class="token comment"># 安装xl2tpd和libreswan（libreswan用以实现IPSec，原先的openswan已经停止维护）</span><br>yum <span class="token function">install</span> -y xl2tpd libreswan <span class="token function">lsof</span><br><br><span class="token comment">#安装iptables防火墙，一般都有自带</span><br>yum <span class="token function">install</span> iptables</code></pre>
+<h2 id="%E9%85%8D%E7%BD%AE" tabindex="-1">配置</h2>
+<h3 id="xl2tpd" tabindex="-1">xl2tpd</h3>
+<p>配置文件<code>/etc/xl2tpd/xl2tpd.conf</code></p>
+<pre class="language-bash"><code class="language-bash"><span class="token punctuation">;</span><br><span class="token punctuation">;</span> This is a minimal sample xl2tpd configuration <span class="token function">file</span> <span class="token keyword">for</span> use<br><span class="token punctuation">;</span> with L2TP over IPsec.<br><span class="token punctuation">;</span><br><span class="token punctuation">;</span> The idea is to provide an L2TP daemon to <span class="token function">which</span> remote Windows L2TP/IPsec<br><span class="token punctuation">;</span> clients connect. In this example, the internal <span class="token punctuation">(</span>protected<span class="token punctuation">)</span> network <br><span class="token punctuation">;</span> is <span class="token number">192.168</span>.1.0/24.  A special IP range within this network is reserved<br><span class="token punctuation">;</span> <span class="token keyword">for</span> the remote clients: <span class="token number">192.168</span>.1.128/25<br><span class="token punctuation">;</span> <span class="token punctuation">(</span>i.e. <span class="token number">192.168</span>.1.128 <span class="token punctuation">..</span>. <span class="token number">192.168</span>.1.254<span class="token punctuation">)</span><br><span class="token punctuation">;</span><br><span class="token punctuation">;</span> The listen-addr parameter can be used <span class="token keyword">if</span> you want to <span class="token builtin class-name">bind</span> the L2TP daemon<br><span class="token punctuation">;</span> to a specific IP address instead of to all interfaces. For instance,<br><span class="token punctuation">;</span> you could <span class="token builtin class-name">bind</span> it to the interface of the internal LAN <span class="token punctuation">(</span>e.g. <span class="token number">192.168</span>.1.98<br><span class="token punctuation">;</span> <span class="token keyword">in</span> the example below<span class="token punctuation">)</span>. Yet another IP address <span class="token punctuation">(</span>local ip, e.g. <span class="token number">192.168</span>.1.99<span class="token punctuation">)</span><br><span class="token punctuation">;</span> will be used by xl2tpd as its address on pppX interfaces.<br><br><span class="token punctuation">[</span>global<span class="token punctuation">]</span><br><span class="token punctuation">;</span> listen-addr <span class="token operator">=</span> <span class="token number">172.16</span>.0.12 <span class="token comment"># 这里我使用了默认配置, 也就是绑定端口到0.0.0.0</span><br><span class="token punctuation">;</span><br><span class="token punctuation">;</span> requires openswan-2.5.18 or higher - Also does not yet work <span class="token keyword">in</span> combination<br><span class="token punctuation">;</span> with kernel mode l2tp as present <span class="token keyword">in</span> linux <span class="token number">2.6</span>.23+<br>ipsec saref <span class="token operator">=</span> <span class="token function">yes</span><br><span class="token punctuation">;</span> Use refinfo of <span class="token number">22</span> <span class="token keyword">if</span> using an SAref kernel patch based on openswan <span class="token number">2.6</span>.35 or<br><span class="token punctuation">;</span>  when using any of the SAref kernel patches <span class="token keyword">for</span> kernels up to <span class="token number">2.6</span>.35.<br><span class="token punctuation">;</span> saref refinfo <span class="token operator">=</span> <span class="token number">30</span><br><span class="token punctuation">;</span><br><span class="token punctuation">;</span> force userspace <span class="token operator">=</span> <span class="token function">yes</span><br><span class="token punctuation">;</span><br><span class="token punctuation">;</span> debug tunnel <span class="token operator">=</span> <span class="token function">yes</span><br>auth <span class="token function">file</span> <span class="token operator">=</span> /etc/ppp/chap-secrets<br>port <span class="token operator">=</span> <span class="token number">1701</span><br><br><span class="token punctuation">[</span>lns default<span class="token punctuation">]</span><br><span class="token function">ip</span> range <span class="token operator">=</span> <span class="token number">192.168</span>.100.128-192.168.100.254 <span class="token comment"># 设置的vpn客户端IP地址段</span><br><span class="token builtin class-name">local</span> <span class="token function">ip</span> <span class="token operator">=</span> <span class="token number">192.168</span>.100.1 <span class="token comment"># 本机分配的vpn IP地址, 保持同一个段</span><br>require chap <span class="token operator">=</span> <span class="token function">yes</span><br>refuse pap <span class="token operator">=</span> <span class="token function">yes</span><br>require authentication <span class="token operator">=</span> <span class="token function">yes</span><br>name <span class="token operator">=</span> LinuxVPNserver<br>ppp debug <span class="token operator">=</span> <span class="token function">yes</span><br>pppoptfile <span class="token operator">=</span> /etc/ppp/options.xl2tpd<br>length bit <span class="token operator">=</span> <span class="token function">yes</span></code></pre>
+<h3 id="ppp" tabindex="-1">ppp</h3>
+<p>配置文件<code>/etc/ppp/options.xl2tpd</code></p>
+<pre class="language-bash"><code class="language-bash">ipcp-accept-local<br>ipcp-accept-remote<br>ms-dns  <span class="token number">8.8</span>.8.8<br>ms-dns  <span class="token number">8.8</span>.4.4<br><span class="token comment"># ms-dns  192.168.1.1</span><br><span class="token comment"># ms-dns  192.168.1.3</span><br><span class="token comment"># ms-wins 192.168.1.2</span><br><span class="token comment"># ms-wins 192.168.1.4</span><br>name l2tpd<br>noccp<br>auth<br><span class="token comment">#obsolete: crtscts</span><br>crtscts<br>idle <span class="token number">1800</span><br>mtu <span class="token number">1410</span><br>mru <span class="token number">1410</span><br>nodefaultroute<br>debug<br><span class="token comment">#obsolete: lock</span><br>lock<br>proxyarp<br>connect-delay <span class="token number">5000</span><br><span class="token comment"># To allow authentication against a Windows domain EXAMPLE, and require the</span><br><span class="token comment"># user to be in a group "VPN Users". Requires the samba-winbind package</span><br><span class="token comment"># require-mschap-v2</span><br><span class="token comment"># plugin winbind.so</span><br><span class="token comment"># ntlm_auth-helper '/usr/bin/ntlm_auth --helper-protocol=ntlm-server-1 --require-membership-of="EXAMPLE\\VPN Users"' </span><br><span class="token comment"># You need to join the domain on the server, for example using samba:</span><br><span class="token comment"># http://rootmanager.com/ubuntu-ipsec-l2tp-windows-domain-auth/setting-up-openswan-xl2tpd-with-native-windows-clients-lucid.html</span><br><br>refuse-pap<br>refuse-chap<br>refuse-mschap<br>require-mschap-v2 <span class="token comment"># Windows连接必须设置</span><br>persist<br>logfile /var/log/xl2tpd.log</code></pre>
+<h3 id="ipsec" tabindex="-1">IPsec</h3>
+<p>主配置文件<code>/etc/ipsec.conf</code></p>
+<pre class="language-bash"><code class="language-bash"><span class="token comment"># /etc/ipsec.conf - Libreswan IPsec configuration file</span><br><span class="token comment">#</span><br><span class="token comment"># see 'man ipsec.conf' and 'man pluto' for more information</span><br><span class="token comment">#</span><br><span class="token comment"># For example configurations and documentation, see https://libreswan.org/wiki/</span><br><br>config setup<br>        <span class="token assign-left variable">protostack</span><span class="token operator">=</span>netkey<br>        <span class="token assign-left variable">dumpdir</span><span class="token operator">=</span>/var/run/pluto/<br>        <span class="token comment"># Normally, pluto logs via syslog.</span><br>        <span class="token comment">#logfile=/var/log/pluto.log</span><br>        <span class="token comment">#</span><br>        <span class="token comment"># Do not enable debug options to debug configuration issues!</span><br>        <span class="token comment">#</span><br>        <span class="token comment"># plutodebug="control parsing"</span><br>        <span class="token comment"># plutodebug="all crypt"</span><br>        <span class="token comment"># plutodebug=none</span><br>        <span class="token comment">#</span><br>        <span class="token comment"># NAT-TRAVERSAL support</span><br>        <span class="token comment"># exclude networks used on server side by adding %v4:!a.b.c.0/24</span><br>        <span class="token comment"># It seems that T-Mobile in the US and Rogers/Fido in Canada are</span><br>        <span class="token comment"># using 25/8 as "private" address space on their wireless networks.</span><br>        <span class="token comment"># This range has never been announced via BGP (at least up to 2015)</span><br>        <span class="token assign-left variable">virtual_private</span><span class="token operator">=</span>%v4:10.0.0.0/8,%v4:192.168.0.0/16,%v4:172.16.0.0/12,%v4:25.0.0.0/8,%v4:100.64.0.0/10,%v6:fd00::/8,%v6:fe80::/10<br><br><span class="token comment"># if it exists, include system wide crypto-policy defaults</span><br><span class="token comment"># include /etc/crypto-policies/back-ends/libreswan.config</span><br><br><span class="token comment"># It is best to add your IPsec connections as separate files in /etc/ipsec.d/</span><br>include /etc/ipsec.d/*.conf</code></pre>
+<p>:::info</p>
+<ul>
+<li>第一行config setup必须左对齐，即前面不能有空格，否则会报错</li>
+<li>其他每一行都必须以Tab开头，否则会报错</li>
+<li>如果安装的是 openswan，可能需要在 config setup 之前添加 version 2.0
+:::</li>
+</ul>
+<p>在<code>/etc/ipsec.secrets</code>中设置PSK密钥</p>
+<pre class="language-bash"><code class="language-bash"><span class="token comment"># 格式为 服务器IP %any: PSK “预共享密钥”，其中 %any: 和 PSK 之间有空格</span><br><span class="token punctuation">[</span>服务器外网IP<span class="token punctuation">]</span> %any: PSK <span class="token string">"123456abcdefg"</span></code></pre>
+<p>接着继续配置服务器, 修改配置文件<code>/etc/ipsec.d/l2tp-ipsec.conf</code></p>
+<pre class="language-bash"><code class="language-bash">conn L2TP-PSK-NAT<br>    <span class="token assign-left variable">rightsubnet</span><span class="token operator">=</span>vhost:%priv<br>    <span class="token assign-left variable">dpddelay</span><span class="token operator">=</span><span class="token number">10</span><br>    <span class="token assign-left variable">dpdtimeout</span><span class="token operator">=</span><span class="token number">20</span><br>    <span class="token assign-left variable">dpdaction</span><span class="token operator">=</span>clear<br>    <span class="token assign-left variable">forceencaps</span><span class="token operator">=</span>yes<br>    <span class="token assign-left variable">also</span><span class="token operator">=</span>L2TP-PSK-noNAT<br>conn L2TP-PSK-noNAT<br>    <span class="token assign-left variable">authby</span><span class="token operator">=</span>secret<br>    <span class="token assign-left variable">pfs</span><span class="token operator">=</span>no<br>    <span class="token assign-left variable">auto</span><span class="token operator">=</span>add<br>    <span class="token assign-left variable">keyingtries</span><span class="token operator">=</span><span class="token number">3</span><br>    <span class="token assign-left variable">rekey</span><span class="token operator">=</span>no<br>    <span class="token assign-left variable">ikelifetime</span><span class="token operator">=</span>8h<br>    <span class="token assign-left variable">keylife</span><span class="token operator">=</span>1h<br>    <span class="token assign-left variable">type</span><span class="token operator">=</span>transport<br>    <span class="token assign-left variable">left</span><span class="token operator">=</span><span class="token number">1.14</span>.239.60<br>    <span class="token assign-left variable">leftprotoport</span><span class="token operator">=</span><span class="token number">17</span>/1701<br>    <span class="token assign-left variable">right</span><span class="token operator">=</span>%any<br>    <span class="token assign-left variable">rightprotoport</span><span class="token operator">=</span><span class="token number">17</span>/%any</code></pre>
+<p>:::info</p>
+<ul>
+<li>conn开头的两行必须左对齐，开头不能有空格，其他每一行必须以Tab缩进</li>
+<li>left 此时也要填服务器的外网IP
+:::</li>
+</ul>
+<h3 id="%E6%B7%BB%E5%8A%A0%E8%B4%A6%E5%8F%B7%E5%AF%86%E7%A0%81" tabindex="-1">添加账号密码</h3>
+<p>配置文件<code>/etc/ppp/chap-secrets</code></p>
+<pre class="language-bash"><code class="language-bash"><span class="token comment"># Secrets for authentication using CHAP</span><br><span class="token comment"># client        server  secret                  IP addresses</span><br>vpntest l2tpd <span class="token number">123456</span> <span class="token number">192.168</span>.100.129</code></pre>
+<p>这里我习惯性的给用户指定固定IP, 方便管理, 如果你是使用<code>*</code>代替, 那就会自动分配指定段的IP地址</p>
+<h3 id="%E5%BC%80%E5%90%AF%E5%86%85%E6%A0%B8%E8%BD%AC%E5%8F%91" tabindex="-1">开启内核转发</h3>
+<p>配置文件<code>/etc/sysctl.conf</code></p>
+<pre class="language-bash"><code class="language-bash"><span class="token comment"># Kernel sysctl configuration file for Red Hat Linux</span><br><span class="token comment">#</span><br><span class="token comment"># For binary values, 0 is disabled, 1 is enabled.  See sysctl(8) and</span><br><span class="token comment"># sysctl.conf(5) for more details.</span><br><span class="token comment">#</span><br><span class="token comment"># Use '/sbin/sysctl -a' to list all possible parameters.</span><br><br><span class="token comment"># Controls IP packet forwarding</span><br>net.ipv4.ip_forward <span class="token operator">=</span> <span class="token number">1</span>            <span class="token comment">#此处的值改为1，开启内核转发</span><br><br><span class="token comment"># Controls source route verification</span><br><br><span class="token comment"># Do not accept source routing</span><br>net.ipv4.conf.default.accept_source_route <span class="token operator">=</span> <span class="token number">0</span><br><br><span class="token comment"># Controls the System Request debugging functionality of the kernel</span><br>kernel.sysrq <span class="token operator">=</span> <span class="token number">0</span><br><br><span class="token comment"># Controls whether core dumps will append the PID to the core filename.</span><br><span class="token comment"># Useful for debugging multi-threaded applications.</span><br>kernel.core_uses_pid <span class="token operator">=</span> <span class="token number">1</span><br><br><span class="token comment"># Controls the use of TCP syncookies</span><br><br><span class="token comment"># Controls the default maxmimum size of a mesage queue</span><br>kernel.msgmnb <span class="token operator">=</span> <span class="token number">65536</span><br><br><span class="token comment"># Controls the maximum size of a message, in bytes</span><br>kernel.msgmax <span class="token operator">=</span> <span class="token number">65536</span><br><br><span class="token comment"># Controls the maximum shared segment size, in bytes</span><br>kernel.shmmax <span class="token operator">=</span> <span class="token number">68719476736</span><br><br><span class="token comment"># Controls the maximum number of shared memory segments, in pages</span><br>kernel.shmall <span class="token operator">=</span> <span class="token number">4294967296</span><br><br>vm.swappiness <span class="token operator">=</span> <span class="token number">0</span><br>net.ipv4.neigh.default.gc_stale_time <span class="token operator">=</span> <span class="token number">120</span><br><br><br><span class="token comment"># see details in https://help.aliyun.com/knowledge_detail/39428.html</span><br>net.ipv4.conf.all.rp_filter <span class="token operator">=</span> <span class="token number">0</span><br>net.ipv4.conf.default.rp_filter <span class="token operator">=</span> <span class="token number">0</span>                <span class="token comment">#此处的值必须是0</span><br>net.ipv4.conf.default.arp_announce <span class="token operator">=</span> <span class="token number">2</span><br>net.ipv4.conf.lo.arp_announce<span class="token operator">=</span><span class="token number">2</span><br>net.ipv4.conf.all.arp_announce<span class="token operator">=</span><span class="token number">2</span><br>net.ipv4.conf.all.send_redirects <span class="token operator">=</span> <span class="token number">0</span>               <span class="token comment">#添加这几行</span><br>net.ipv4.conf.default.send_redirects <span class="token operator">=</span> <span class="token number">0</span>           <span class="token comment">#添加这几行</span><br>net.ipv4.conf.all.log_martians <span class="token operator">=</span> <span class="token number">0</span>                 <span class="token comment">#添加这几行</span><br>net.ipv4.conf.default.log_martians <span class="token operator">=</span> <span class="token number">0</span>             <span class="token comment">#添加这几行</span><br>net.ipv4.conf.all.accept_redirects <span class="token operator">=</span> <span class="token number">0</span>             <span class="token comment">#添加这几行</span><br>net.ipv4.conf.default.accept_redirects <span class="token operator">=</span> <span class="token number">0</span>         <span class="token comment">#添加这几行</span><br>net.ipv4.icmp_ignore_bogus_error_responses <span class="token operator">=</span> <span class="token number">1</span>     <span class="token comment">#添加这几行</span><br><br><span class="token comment"># see details in https://help.aliyun.com/knowledge_detail/41334.html</span><br>net.ipv4.tcp_max_tw_buckets <span class="token operator">=</span> <span class="token number">5000</span><br>net.ipv4.tcp_syncookies <span class="token operator">=</span> <span class="token number">1</span><br>net.ipv4.tcp_max_syn_backlog <span class="token operator">=</span> <span class="token number">1024</span><br>net.ipv4.tcp_synack_retries <span class="token operator">=</span> <span class="token number">2</span></code></pre>
+<p>完了, 重载内核配置</p>
+<pre class="language-bash"><code class="language-bash">sysctl -p</code></pre>
+<h3 id="%E9%85%8D%E7%BD%AEip%E8%BD%AC%E5%8F%91" tabindex="-1">配置ip转发</h3>
+<pre class="language-bash"><code class="language-bash"><span class="token comment">## ip为服务器内网ip</span><br>iptables -t nat -A POSTROUTING -s <span class="token number">192.168</span>.0.0/24 -o eth1 -j MASQUERADE<br><br><span class="token comment">## 查看nat配置</span><br>iptables -t nat -L -n</code></pre>
+<h2 id="%E5%90%AF%E5%8A%A8" tabindex="-1">启动</h2>
+<pre class="language-bash"><code class="language-bash"><span class="token comment">## xl2tpd debug 模式, 可以实时查看运行日志</span><br>xl2tpd -D<br><br><span class="token comment">## IPsec状态检验, 如果有[FAILED]就不行, 需要对症解决</span><br>ipsec verify<br><br><span class="token comment">## 启动</span><br>systemctl start ipsec<br>systemctl start xl2tpd<br><br><span class="token comment">## 查看状态</span><br>systemctl status ipsec<br>systemctl status xl2tpd<br><br><span class="token comment">## 设置开机启动</span><br>systemctl <span class="token builtin class-name">enable</span> ipsec<br>systemctl <span class="token builtin class-name">enable</span> xl2tpd</code></pre>
+<h2 id="windows%E5%AE%A2%E6%88%B7%E7%AB%AF%E9%85%8D%E7%BD%AE" tabindex="-1">Windows客户端配置</h2>
+<ol>
+<li><code>windows+r</code>打开运行，输入<code>services.msc</code>，查找<code>ipsec policy agent</code>，启用服务</li>
+<li>打开注册表，路径<code>HKEY_LOCAL_MACHINE\System\CurrentControlSet\Services\Rasman\Parameters</code>
+<ul>
+<li>添加DWORD值(32位)值，名称<code>ProhibitIpSec</code>，值为 1</li>
+<li>由于缺省的 Windows XP L2TP 传输策略不允许不使用 IPSec 加密的 L2TP 传输，修改<code>AllowL2TPWeakCrypto</code>的值为<code>1</code></li>
+<li>重启电脑</li>
+</ul>
+</li>
+</ol>
+<h2 id="linux%E5%AE%A2%E6%88%B7%E7%AB%AF%E9%85%8D%E7%BD%AE" tabindex="-1">Linux客户端配置</h2>
+<blockquote>
+<p>以Centos 7为例</p>
+</blockquote>
+<ol>
+<li>安装 VPN 客户端</li>
+</ol>
+<pre class="language-bash"><code class="language-bash">yum -y <span class="token function">install</span> epel-release<br>yum -y <span class="token function">install</span> strongswan xl2tpd<br><br><span class="token comment">## 设置 VPN 变量</span><br><span class="token assign-left variable">VPN_SERVER_IP</span><span class="token operator">=</span><span class="token string">'VPN服务器IP'</span> <br><span class="token assign-left variable">VPN_IPSEC_PSK</span><span class="token operator">=</span><span class="token string">'PSK密钥'</span> <br><span class="token assign-left variable">VPN_USERNAME</span><span class="token operator">=</span><span class="token string">'用户名'</span> <br><span class="token assign-left variable">VPN_PASSWORD</span><span class="token operator">=</span><span class="token string">'密码'</span></code></pre>
+<ol start="2">
+<li>配置strongSwan</li>
+</ol>
+<pre class="language-bash"><code class="language-bash"><span class="token function">cat</span> <span class="token operator">></span> /etc/ipsec.conf <span class="token operator">&lt;&lt;</span><span class="token string">EOF<br># ipsec.conf - strongSwan IPsec configuration file<br># basic configuration<br>config setup<br> # strictcrlpolicy=yes<br> # uniqueids = no<br># Add connections here.<br># Sample VPN connections<br>conn %default<br> ikelifetime=60m<br> keylife=20m<br> rekeymargin=3m<br> keyingtries=1<br> keyexchange=ikev1<br> authby=secret<br> ike=aes128-sha1-modp1024,3des-sha1-modp1024!<br> esp=aes128-sha1-modp1024,3des-sha1-modp1024!<br>conn myvpn<br> keyexchange=ikev1<br> left=%defaultroute<br> auto=add<br> authby=secret<br> type=transport<br> leftprotoport=17/1701<br> rightprotoport=17/1701<br> right=<span class="token variable">$VPN_SERVER_IP</span><br>EOF</span><br><span class="token function">cat</span> <span class="token operator">></span> /etc/ipsec.secrets <span class="token operator">&lt;&lt;</span><span class="token string">EOF<br>: PSK "<span class="token variable">$VPN_IPSEC_PSK</span>"<br>EOF</span><br><span class="token function">chmod</span> <span class="token number">600</span> /etc/ipsec.secrets<br><span class="token comment"># For CentOS/RHEL &amp; Fedora ONLY</span><br><span class="token function">mv</span> /etc/strongswan/ipsec.conf /etc/strongswan/ipsec.conf.old <span class="token operator"><span class="token file-descriptor important">2</span>></span>/dev/null<br><span class="token function">mv</span> /etc/strongswan/ipsec.secrets /etc/strongswan/ipsec.secrets.old <span class="token operator"><span class="token file-descriptor important">2</span>></span>/dev/null<br><span class="token function">ln</span> -s /etc/ipsec.conf /etc/strongswan/ipsec.conf<br><span class="token function">ln</span> -s /etc/ipsec.secrets /etc/strongswan/ipsec.secrets</code></pre>
+<ol start="3">
+<li>配置xl2tpd</li>
+</ol>
+<pre class="language-bash"><code class="language-bash"><span class="token function">cat</span> <span class="token operator">></span> /etc/xl2tpd/xl2tpd.conf <span class="token operator">&lt;&lt;</span><span class="token string">EOF<br>[lac myvpn]<br>lns = <span class="token variable">$VPN_SERVER_IP</span><br>ppp debug = yes<br>pppoptfile = /etc/ppp/options.l2tpd.client<br>length bit = yes<br>EOF</span><br><br><span class="token function">cat</span> <span class="token operator">></span> /etc/ppp/options.l2tpd.client <span class="token operator">&lt;&lt;</span><span class="token string">EOF<br>ipcp-accept-local<br>ipcp-accept-remote<br>refuse-eap<br>require-chap<br>noccp<br>noauth<br>mtu 1280<br>mru 1280<br>noipdefault<br>defaultroute<br>usepeerdns<br>connect-delay 5000<br>name <span class="token variable">$VPN_USER</span><br>password <span class="token variable">$VPN_PASSWORD</span><br>EOF</span><br><br><span class="token function">chmod</span> <span class="token number">600</span> /etc/ppp/options.l2tpd.client</code></pre>
+<ol start="4">
+<li>连接VPN</li>
+</ol>
+<pre class="language-bash"><code class="language-bash"><span class="token function">mkdir</span> -p /var/run/xl2tpd<br><span class="token function">touch</span> /var/run/xl2tpd/l2tp-control <br><span class="token function">service</span> strongswan restart<br><span class="token function">service</span> xl2tpd restart<br><br><span class="token comment">## 连接VPN</span><br>strongswan up myvpn<br><span class="token builtin class-name">echo</span> <span class="token string">"c myvpn"</span> <span class="token operator">></span> /var/run/xl2tpd/l2tp-control<br><br><span class="token comment">## 断开VPN</span><br><span class="token builtin class-name">echo</span> <span class="token string">"d myvpn"</span> <span class="token operator">></span> /var/run/xl2tpd/l2tp-control<br>strongswan down myvpn</code></pre>
+<h2 id="%E6%89%A9%E5%B1%95%E7%9F%A5%E8%AF%86" tabindex="-1">扩展知识</h2>
+<p>比较一下现在主流VPN协议的优缺点</p>
+<h3 id="pptp" tabindex="-1">PPTP</h3>
+<p>点对点隧道协议（英语：Point to Point Tunneling Protocol，缩写为PPTP）是实现虚拟专用网（VPN）的方式之一。PPTP使用传输控制协议（TCP）创建控制通道来发送控制命令，以及利用通用路由封装（GRE）通道来封装点对点协议（PPP）数据包以发送资料。这个协议最早由微软等厂商主导开发，但因为它的加密方式容易被破解，微软已经不再建议使用这个协议。</p>
+<h4 id="%E4%BC%98%E7%82%B9" tabindex="-1">优点</h4>
+<ul>
+<li>速度快</li>
+<li>几乎所有平台都内置</li>
+<li>配置极为简单</li>
+</ul>
+<h4 id="%E7%BC%BA%E7%82%B9" tabindex="-1">缺点</h4>
+<ul>
+<li>受到美国国安局威胁</li>
+<li>不安全</li>
+</ul>
+<h3 id="l2tp-and-l2tp%2Fipsec" tabindex="-1">L2TP and L2TP/IPsec</h3>
+<h4 id="%E4%BC%98%E7%82%B9-1" tabindex="-1">优点</h4>
+<ul>
+<li>可供所有现代的设备及操作系统使用</li>
+<li>容易设定</li>
+</ul>
+<h4 id="%E7%BC%BA%E7%82%B9-1" tabindex="-1">缺点</h4>
+<ul>
+<li>比OpenVPN慢</li>
+<li>可能受到美国国安局的威胁</li>
+<li>与限制力强的防火请一起使用会有问题</li>
+<li>美国国安局极有可能已经削弱这个协议的能力</li>
+</ul>
+<h3 id="openvpn" tabindex="-1">OpenVPN</h3>
+<p>OpenVPN是一个用于创建虚拟私人网络加密通道的软件包，最早由James Yonan编写。OpenVPN允许创建的VPN使用公开密钥、电子证书、或者用户名／密码来进行身份验证。</p>
+<p>它大量使用了OpenSSL加密库中的SSL/TLS协议函数库。</p>
+<p>OpenVPN的技术核心是虚拟网卡，其次是SSL协议实现。</p>
+<h4 id="%E4%BC%98%E7%82%B9-2" tabindex="-1">优点</h4>
+<ul>
+<li>具备能跨越大多数防火墙的能力</li>
+<li>高度可配置</li>
+<li>因为是开放资源，所以可以轻松修正后门</li>
+<li>能使用各种加密功能运算法</li>
+<li>高度安全性</li>
+</ul>
+<h4 id="%E7%BC%BA%E7%82%B9-2" tabindex="-1">缺点</h4>
+<ul>
+<li>设定起来有点棘手</li>
+<li>需要用到第三方软件</li>
+<li>桌面电脑支援做得好，可是流动设备的则需要改进</li>
+</ul>
+<h3 id="sstp" tabindex="-1">SSTP</h3>
+<p>SSTP可以创建一个在HTTPS上传送的VPN隧道，从而消除与基于PPTP（点对点隧道协议）或L2TP（第2层隧道协议）VPN连接有关的诸多问题。因为这些协议有可能受到某些位于客户端与服务器之间的Web代理、防火墙和网络地址转换（NAT）路由器的阻拦。</p>
+<p>这种SSTP只适用于远程访问，不能支持站点与站点之间的VPN隧道。</p>
+<h4 id="%E4%BC%98%E7%82%B9-3" tabindex="-1">优点</h4>
+<ul>
+<li>具备越过大多数防火墙的能力</li>
+<li>安全标准取决与密码，但一般来说是安全的</li>
+<li>能完全融入Windows操作系统</li>
+<li>微软支援</li>
+</ul>
+<h4 id="%E7%BC%BA%E7%82%B9-3" tabindex="-1">缺点</h4>
+<ul>
+<li>因为是专利标准是由微软公司持有，因此不能修正后门</li>
+<li>只能在Windows平台上操作</li>
+</ul>
+<h3 id="ikev2" tabindex="-1">IKEv2</h3>
+<p>因特网密钥交换（英语：Internet Key Exchange，简称IKE或IKEv2）是一种网络协议，归属于IPsec协议族，用以创建安全关系（Security association，SA）。它创建在奥克利协议（Oakley protocol）与ISAKMP协议的基础之上。</p>
+<h4 id="%E4%BC%98%E7%82%B9-4" tabindex="-1">优点</h4>
+<ul>
+<li>极度安全–支援各种密码如3DES、 AES、 AES 256等</li>
+<li>支援黑莓设备</li>
+<li>稳定，特别是在连接中断或者是交换网络使用时更是如此</li>
+<li>容易设定，至少从用户终端是如此</li>
+<li>比 L2TP、PPTP 及 SSTP相对更快速</li>
+</ul>
+<h4 id="%E7%BC%BA%E7%82%B9-4" tabindex="-1">缺点</h4>
+<ul>
+<li>支援平台有限</li>
+<li>为基础的方案像是SSTP或OpenVPN而较容易被阻挡，因为使用UDP 端口500</li>
+<li>不是开放资源实现方案</li>
+<li>在非服务器端施用IKEv2比较棘手，能导致一些潜在问题</li>
+</ul>
+<h2 id="%E5%8F%82%E8%80%83" tabindex="-1">参考</h2>
+<ul>
+<li><a href="https://zh.wikipedia.org/wiki/%E7%AC%AC%E4%BA%8C%E5%B1%82%E9%9A%A7%E9%81%93%E5%8D%8F%E8%AE%AE">第二层隧道协议</a></li>
+<li><a href="https://www.wenjinyu.me/zh/centos-7-build-l2tp-vpn/#%E5%87%86%E5%A4%87">CentOS 7搭建L2TP VPN</a></li>
+<li><a href="https://www.linuxprobe.com/centos7-install-l2tp.html">CentOS7 搭建L2TP</a></li>
+<li><a href="https://imkira.com/CentOS7-L2TP-IPsec-VPN/">Centos7 搭建 L2TP+ IPsec VPN</a></li>
+<li><a href="https://blog.csdn.net/weixin_44901564/article/details/106619826">L2TP连接尝试失败，因为安全层再初始化与远程计算机的协商时遇到一个处理错误</a></li>
+<li><a href="https://zh.vpnmentor.com/blog/%e6%af%94%e8%be%83vpn%e5%8d%8f%e8%ae%ae-pptp-%e5%af%b9-l2tp-%e5%af%b9-openvpn-%e5%af%b9sstp-%e5%af%b9-ikev2/">比较VPN协议: PPTP 对 L2TP 对 OpenVPN 对SSTP 对 IKEv2</a></li>
+<li><a href="https://www.myip.io/how-to-details/configure-l2tp-centos">Configuring L2TP connection on Centos 7</a></li>
+</ul>
+
+    <div>
+  </div>  
+</div>
+</div>
+        </main>
+      </div>
+    </div>
+</body>
+</html>
