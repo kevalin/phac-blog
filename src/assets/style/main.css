@@ -1,0 +1,11 @@
+/* @import "@chinese-fonts/lxgwwenkai/index.css"; */
+
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+.text-gradient {
+  background: linear-gradient(to right, #ff7e5f, #feb47b, #86a8e7, #91eae4);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+}

@@ -2,10 +2,10 @@
 layout: post
 title: Centos7 搭建L2TP+IPsec VPN
 date: 2023-02-22 23:27:20
-# tags: [Linux, VPN]
-tags: posts
+tags:
+  - posts
+  - linux
 thumbnail: https://images.unsplash.com/photo-1603985529862-9e12198c9a60?ixlib=rb-4.0.3&ixid=MnwxMjA3fDB8MHxzZWFyY2h8Mnx8dnBufGVufDB8fDB8fA%3D%3D&auto=format&fit=crop&w=800&q=60
-
 ---
 
 # Centos7 搭建L2TP+IPsec VPN
@@ -15,6 +15,7 @@ L2TP是一种工业标准的Internet隧道协议，功能大致和PPTP协议类�
 ## 前期准备
 
 检查L2TP需要的环境支持
+
 ```bash
 # 查看主机是否支持pptp，返回结果为yes就表示通过
 modprobe ppp-compress-18 && echo yes
@@ -60,7 +61,7 @@ yum install iptables
 ; with L2TP over IPsec.
 ;
 ; The idea is to provide an L2TP daemon to which remote Windows L2TP/IPsec
-; clients connect. In this example, the internal (protected) network 
+; clients connect. In this example, the internal (protected) network
 ; is 192.168.1.0/24.  A special IP range within this network is reserved
 ; for the remote clients: 192.168.1.128/25
 ; (i.e. 192.168.1.128 ... 192.168.1.254)
@@ -130,7 +131,7 @@ connect-delay 5000
 # user to be in a group "VPN Users". Requires the samba-winbind package
 # require-mschap-v2
 # plugin winbind.so
-# ntlm_auth-helper '/usr/bin/ntlm_auth --helper-protocol=ntlm-server-1 --require-membership-of="EXAMPLE\\VPN Users"' 
+# ntlm_auth-helper '/usr/bin/ntlm_auth --helper-protocol=ntlm-server-1 --require-membership-of="EXAMPLE\\VPN Users"'
 # You need to join the domain on the server, for example using samba:
 # http://rootmanager.com/ubuntu-ipsec-l2tp-windows-domain-auth/setting-up-openswan-xl2tpd-with-native-windows-clients-lucid.html
 
@@ -180,10 +181,11 @@ include /etc/ipsec.d/*.conf
 ```
 
 :::info
+
 - 第一行config setup必须左对齐，即前面不能有空格，否则会报错
 - 其他每一行都必须以Tab开头，否则会报错
 - 如果安装的是 openswan，可能需要在 config setup 之前添加 version 2.0
-:::
+  :::
 
 在`/etc/ipsec.secrets`中设置PSK密钥
 
@@ -218,9 +220,10 @@ conn L2TP-PSK-noNAT
 ```
 
 :::info
+
 - conn开头的两行必须左对齐，开头不能有空格，其他每一行必须以Tab缩进
 - left 此时也要填服务器的外网IP
-:::
+  :::
 
 ### 添加账号密码
 
@@ -301,6 +304,7 @@ net.ipv4.tcp_synack_retries = 2
 ```
 
 完了, 重载内核配置
+
 ```bash
 sysctl -p
 ```
@@ -341,9 +345,9 @@ systemctl enable xl2tpd
 
 1. `windows+r`打开运行，输入`services.msc`，查找`ipsec policy agent`，启用服务
 2. 打开注册表，路径`HKEY_LOCAL_MACHINE\System\CurrentControlSet\Services\Rasman\Parameters`
-    - 添加DWORD值(32位)值，名称`ProhibitIpSec`，值为 1
-    - 由于缺省的 Windows XP L2TP 传输策略不允许不使用 IPSec 加密的 L2TP 传输，修改`AllowL2TPWeakCrypto`的值为`1`
-    - 重启电脑
+   - 添加DWORD值(32位)值，名称`ProhibitIpSec`，值为 1
+   - 由于缺省的 Windows XP L2TP 传输策略不允许不使用 IPSec 加密的 L2TP 传输，修改`AllowL2TPWeakCrypto`的值为`1`
+   - 重启电脑
 
 ## Linux客户端配置
 
@@ -356,11 +360,12 @@ yum -y install epel-release
 yum -y install strongswan xl2tpd
 
 ## 设置 VPN 变量
-VPN_SERVER_IP='VPN服务器IP' 
-VPN_IPSEC_PSK='PSK密钥' 
-VPN_USERNAME='用户名' 
+VPN_SERVER_IP='VPN服务器IP'
+VPN_IPSEC_PSK='PSK密钥'
+VPN_USERNAME='用户名'
 VPN_PASSWORD='密码'
 ```
+
 2. 配置strongSwan
 
 ```bash
@@ -401,6 +406,7 @@ mv /etc/strongswan/ipsec.secrets /etc/strongswan/ipsec.secrets.old 2>/dev/null
 ln -s /etc/ipsec.conf /etc/strongswan/ipsec.conf
 ln -s /etc/ipsec.secrets /etc/strongswan/ipsec.secrets
 ```
+
 3. 配置xl2tpd
 
 ```bash
@@ -436,7 +442,7 @@ chmod 600 /etc/ppp/options.l2tpd.client
 
 ```bash
 mkdir -p /var/run/xl2tpd
-touch /var/run/xl2tpd/l2tp-control 
+touch /var/run/xl2tpd/l2tp-control
 service strongswan restart
 service xl2tpd restart
 
@@ -458,21 +464,25 @@ strongswan down myvpn
 点对点隧道协议（英语：Point to Point Tunneling Protocol，缩写为PPTP）是实现虚拟专用网（VPN）的方式之一。PPTP使用传输控制协议（TCP）创建控制通道来发送控制命令，以及利用通用路由封装（GRE）通道来封装点对点协议（PPP）数据包以发送资料。这个协议最早由微软等厂商主导开发，但因为它的加密方式容易被破解，微软已经不再建议使用这个协议。
 
 #### 优点
+
 - 速度快
 - 几乎所有平台都内置
 - 配置极为简单
 
 #### 缺点
+
 - 受到美国国安局威胁
 - 不安全
 
 ### L2TP and L2TP/IPsec
 
 #### 优点
+
 - 可供所有现代的设备及操作系统使用
 - 容易设定
 
 #### 缺点
+
 - 比OpenVPN慢
 - 可能受到美国国安局的威胁
 - 与限制力强的防火请一起使用会有问题
@@ -487,6 +497,7 @@ OpenVPN是一个用于创建虚拟私人网络加密通道的软件包，最早�
 OpenVPN的技术核心是虚拟网卡，其次是SSL协议实现。
 
 #### 优点
+
 - 具备能跨越大多数防火墙的能力
 - 高度可配置
 - 因为是开放资源，所以可以轻松修正后门
@@ -494,6 +505,7 @@ OpenVPN的技术核心是虚拟网卡，其次是SSL协议实现。
 - 高度安全性
 
 #### 缺点
+
 - 设定起来有点棘手
 - 需要用到第三方软件
 - 桌面电脑支援做得好，可是流动设备的则需要改进
@@ -505,12 +517,14 @@ SSTP可以创建一个在HTTPS上传送的VPN隧道，从而消除与基于PPTP�
 这种SSTP只适用于远程访问，不能支持站点与站点之间的VPN隧道。
 
 #### 优点
+
 - 具备越过大多数防火墙的能力
 - 安全标准取决与密码，但一般来说是安全的
 - 能完全融入Windows操作系统
 - 微软支援
 
 #### 缺点
+
 - 因为是专利标准是由微软公司持有，因此不能修正后门
 - 只能在Windows平台上操作
 
@@ -519,6 +533,7 @@ SSTP可以创建一个在HTTPS上传送的VPN隧道，从而消除与基于PPTP�
 因特网密钥交换（英语：Internet Key Exchange，简称IKE或IKEv2）是一种网络协议，归属于IPsec协议族，用以创建安全关系（Security association，SA）。它创建在奥克利协议（Oakley protocol）与ISAKMP协议的基础之上。
 
 #### 优点
+
 - 极度安全–支援各种密码如3DES、 AES、 AES 256等
 - 支援黑莓设备
 - 稳定，特别是在连接中断或者是交换网络使用时更是如此
@@ -526,6 +541,7 @@ SSTP可以创建一个在HTTPS上传送的VPN隧道，从而消除与基于PPTP�
 - 比 L2TP、PPTP 及 SSTP相对更快速
 
 #### 缺点
+
 - 支援平台有限
 - 为基础的方案像是SSTP或OpenVPN而较容易被阻挡，因为使用UDP 端口500
 - 不是开放资源实现方案
@@ -540,4 +556,3 @@ SSTP可以创建一个在HTTPS上传送的VPN隧道，从而消除与基于PPTP�
 - [L2TP连接尝试失败，因为安全层再初始化与远程计算机的协商时遇到一个处理错误](https://blog.csdn.net/weixin_44901564/article/details/106619826)
 - [比较VPN协议: PPTP 对 L2TP 对 OpenVPN 对SSTP 对 IKEv2](https://zh.vpnmentor.com/blog/%e6%af%94%e8%be%83vpn%e5%8d%8f%e8%ae%ae-pptp-%e5%af%b9-l2tp-%e5%af%b9-openvpn-%e5%af%b9sstp-%e5%af%b9-ikev2/)
 - [Configuring L2TP connection on Centos 7](https://www.myip.io/how-to-details/configure-l2tp-centos)
-

@@ -1,8 +1,7 @@
 ---
 layout: post
-title: "About me"
 ---
 
-# hello world
+# About me
 
 a programer.

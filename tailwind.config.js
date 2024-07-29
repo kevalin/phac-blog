@@ -1,10 +1,10 @@
 module.exports = {
-  content: ["./src/**/*.{njk,md}", "./src/**/*.svg"],
+  content: ["./src/**/*.{njk,md,css}", "./src/**/*.svg"],
   theme: {
     container: {
-      center: true
+      center: true,
     },
     extend: {},
   },
-  plugins: [],
-}
+  plugins: [require("@tailwindcss/typography")],
+};
