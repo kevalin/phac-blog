@@ -9,8 +9,8 @@
   <title>{{ title | withBlogName }}</title>
 </head>
 <body>
-    <div class="prose container mx-auto text-sm">
-      <nav class="text-base pt-4 flex justify-between items-center">
+    <div class="prose container mx-auto text-base">
+      <nav class="pt-4 flex justify-between items-center text-xl">
         <div class="mr-auto">
           <a class="text-gray-600 hover:text-gray-500 font-bold no-underline text-gradient hover-glow" href="/">举个栗子</a>
         </div>
@@ -26,9 +26,7 @@
           {% endfor %}
         </div>
       </nav>
-      <div class="container mx-auto text-sm">
-        {{ content | safe }}
-      </div>
+      {{ content | safe }}
     </div>
 </body>
 </html>
