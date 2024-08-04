@@ -1,10 +1,6 @@
 module.exports = {
   theme: {
-    extend: {
-      fontFamily: {
-        wenkai: ["LXGW WenKai", "sans-serif"],
-      },
-    },
+    extend: {},
   },
   plugins: {
     tailwindcss: {},

@@ -1,0 +1,20 @@
+---
+layout: layouts/base.njk
+title: photos
+---
+
+<div class="pt-10 pb-20">
+  <h1>Photos</h1>
+  <blockquote><p>捕捉那些美丽瞬间，用影像编织成诗意的画卷，记录下这世间的温柔与美好 ...</p></blockquote>
+  {% set sortedData = photos.data | sort(attribute='date', reverse=true) %}
+  {% for photo in sortedData %}
+      <div class="relative">
+        <img src="http://localhost:8080/assets/photos/{{ photo.filename }}" alt="{{ photo.title }}" class="rounded-md" />
+        <span class="absolute bottom-2 right-2 bg-gray-800 text-white text-xs p-1 rounded-md">拍摄于 {{ photo.date | formaterDate }}</span>
+      </div>
+      <p>{{ photo.desc }}</p>
+      <hr>
+  {% endfor %}
+</div>
+
+

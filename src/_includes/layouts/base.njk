@@ -5,11 +5,12 @@
   <meta http-equiv="X-UA-Compatible" content="IE=edge">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/prismjs@1.29.0/themes/prism-solarizedlight.min.css">
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/lxgw-wenkai-screen-webfont@1.7.0/style.min.css">
   <link rel="stylesheet" href="{{ '/assets/style/main.css' | url }}">
   <title>{{ title | withBlogName }}</title>
 </head>
 <body>
-    <div class="prose container mx-auto text-base">
+    <div class="prose container mx-auto text-base font-wenkai">
       <nav class="pt-4 flex justify-between items-center text-xl">
         <div class="mr-auto">
           <a class="text-gray-600 hover:text-gray-500 font-bold no-underline text-gradient hover-glow" href="/">举个栗子</a>
@@ -26,7 +27,9 @@
           {% endfor %}
         </div>
       </nav>
-      {{ content | safe }}
+      <div class="prose-img:rounded-md">
+        {{ content | safe }}
+      </div>
     </div>
 </body>
 </html>

@@ -2,6 +2,7 @@
   "nav": [
     { "title": "Home", "url": "/" },
     { "title": "Photos", "url": "/photos" },
+    { "title": "Cafes", "url": "/cafes" },
     { "title": "About", "url": "/about" }
   ]
 }
